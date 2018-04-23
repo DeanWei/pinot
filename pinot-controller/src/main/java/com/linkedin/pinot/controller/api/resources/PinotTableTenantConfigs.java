@@ -27,8 +27,8 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
-import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,15 +46,20 @@ public class PinotTableTenantConfigs {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/rebuildBrokerResourceFromHelixTags")
   @ApiOperation(value = "Rebuild broker resource for table", notes = "when new brokers are added")
-  @ApiResponses(value = {@ApiResponse(code=200, message = "Success"),
+  @ApiResponses(value = {
+      @ApiResponse(code=200, message = "Success"),
+      @ApiResponse(code = 400, message = "Broker resource cannot be rebuilt because ideal state is the same for this table"),
       @ApiResponse(code = 404, message = "Table not found"),
       @ApiResponse(code = 500, message = "Internal error rebuilding broker resource or serializing response")})
-  public String rebuildBrokerResource(
+  public SuccessResponse rebuildBrokerResource(
       @ApiParam(value = "Table name (with type)", required = true) @PathParam("tableName") String tableNameWithType
-  ) throws JSONException {
-    final PinotResourceManagerResponse pinotResourceManagerResponse =
-        _helixResourceManager.rebuildBrokerResourceFromHelixTags(tableNameWithType);
-
-    return pinotResourceManagerResponse.toJSON().toString();
+  ) {
+    try {
+      final PinotResourceManagerResponse pinotResourceManagerResponse =
+          _helixResourceManager.rebuildBrokerResourceFromHelixTags(tableNameWithType);
+      return new SuccessResponse(pinotResourceManagerResponse.getMessage());
+    } catch (WebApplicationException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), e.getResponse().getStatus());
+    }
   }
 }
